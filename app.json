@@ -13,7 +13,13 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kduy181.healthcareapp",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Ứng dụng cần truy cập Camera để thực hiện cuộc gọi video với bác sĩ.",
+        "NSMicrophoneUsageDescription": "Ứng dụng cần truy cập Micro để ghi âm ghi chú bệnh án và gọi video."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +28,14 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.kduy181.healthcareapp",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -30,10 +43,37 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#2196F3"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Ứng dụng cần truy cập Camera để thực hiện cuộc gọi video với bác sĩ.",
+          "microphonePermission": "Ứng dụng cần truy cập Micro để ghi âm ghi chú bệnh án và gọi video.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Ứng dụng cần truy cập Micro để ghi âm ghi chú bệnh án."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5204628e-ce31-4c1b-ad82-8ca980097b0b"
+      }
     }
   }
 }

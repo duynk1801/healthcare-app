@@ -31,7 +31,13 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
+.env.*
 .env*.local
+
+# Firebase / Google Services (contains API keys)
+google-services.json
+GoogleService-Info.plist
 
 # typescript
 *.tsbuildinfo
@@ -39,3 +45,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+service-account-key.json
+
+# Gemini agent
+.agent/
+antigravity.config.json

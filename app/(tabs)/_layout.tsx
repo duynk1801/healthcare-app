@@ -1,69 +1,64 @@
-import React from 'react';
-import { SymbolView } from 'expo-symbols';
-import { Link, Tabs } from 'expo-router';
-import { Platform, Pressable } from 'react-native';
-
-import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+import { Tabs } from 'expo-router';
+import { FileText, Home, Stethoscope, Video } from 'lucide-react-native';
+import React from 'react';
+
+/** Tab bar icon size */
+const ICON_SIZE = 24;
+
+/** Colors matching tailwind.config.js */
+const TAB_COLORS = {
+  light: { active: '#2196F3', inactive: '#BDBDBD' },
+  dark: { active: '#3AA5F5', inactive: '#757575' },
+} as const;
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = TAB_COLORS[colorScheme];
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
-      }}>
+        headerShown: false,
+        tabBarActiveTintColor: colors.active,
+        tabBarInactiveTintColor: colors.inactive,
+        tabBarStyle: {
+          borderTopWidth: 1,
+          borderTopColor: colorScheme === 'dark' ? '#424242' : '#EEEEEE',
+          backgroundColor: colorScheme === 'dark' ? '#212121' : '#FFFFFF',
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+        },
+      }}
+    >
       <Tabs.Screen
-        name="index"
+        name='index'
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{
-                ios: 'chevron.left.forwardslash.chevron.right',
-                android: 'code',
-                web: 'code',
-              }}
-              tintColor={color}
-              size={28}
-            />
-          ),
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable style={{ marginRight: 15 }}>
-                {({ pressed }) => (
-                  <SymbolView
-                    name={{ ios: 'info.circle', android: 'info', web: 'info' }}
-                    size={25}
-                    tintColor={Colors[colorScheme].text}
-                    style={{ opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
-          ),
+          title: 'Home',
+          tabBarIcon: ({ color }) => <Home size={ICON_SIZE} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="two"
+        name='doctors'
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{
-                ios: 'chevron.left.forwardslash.chevron.right',
-                android: 'code',
-                web: 'code',
-              }}
-              tintColor={color}
-              size={28}
-            />
-          ),
+          title: 'Doctors',
+          tabBarIcon: ({ color }) => <Stethoscope size={ICON_SIZE} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name='video'
+        options={{
+          title: 'Video',
+          tabBarIcon: ({ color }) => <Video size={ICON_SIZE} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name='records'
+        options={{
+          title: 'Records',
+          tabBarIcon: ({ color }) => <FileText size={ICON_SIZE} color={color} />,
         }}
       />
     </Tabs>
