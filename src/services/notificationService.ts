@@ -74,12 +74,17 @@ export const NotificationService = {
         return undefined;
       }
 
-      const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+      try {
+        const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+        token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
 
-      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-
-      if (__DEV__) {
-        console.log('📱 Expo Push Token:', token);
+        if (__DEV__) {
+          console.log('📱 Expo Push Token:', token);
+        }
+      } catch (error) {
+        // Personal Team (free Apple ID) doesn't support push notifications
+        // Also fails on emulators without proper config
+        console.warn('⚠️ Push token registration failed (expected on Personal Team):', (error as Error).message);
       }
     } else {
       console.log('ℹ️ Push notifications require a physical device');

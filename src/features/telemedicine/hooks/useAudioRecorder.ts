@@ -1,133 +1,136 @@
-import { Audio } from 'expo-av';
-import type { AVPlaybackStatus } from 'expo-av';
+import {
+  createAudioPlayer,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
+  useAudioRecorderState,
+} from 'expo-audio';
+import type { AudioPlayer } from 'expo-audio';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { IRecordingResult, IUseAudioRecorderReturn, RecorderStatus } from '../types';
 
 /**
- * Hook for recording & playing back medical notes audio using expo-av.
- * Independent from LiveKit — can be used anywhere.
+ * Hook for recording & playing back medical notes audio using expo-audio.
+ * Replaces expo-av (deprecated in SDK 55).
  *
- * Features:
- * - Permission management (request microphone access)
- * - Start/stop recording with HIGH_QUALITY preset
- * - Real-time duration tracking (100ms interval)
- * - Playback recorded audio with position tracking
- * - Auto-cleanup on unmount
+ * Why NOT using useAudioPlayer hook:
+ * - useAudioPlayer(null) crashes on mount when no URI exists yet
+ * - Using createAudioPlayer() imperatively gives us control
+ *   over when to create/destroy the player instance
  */
-export const useAudioRecorder = (): IUseAudioRecorderReturn => {
+export const useAudioRecorderHook = (): IUseAudioRecorderReturn => {
   const [status, setStatus] = useState<RecorderStatus>('idle');
-  const [durationMs, setDurationMs] = useState(0);
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [finalDurationMs, setFinalDurationMs] = useState(0);
 
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackPositionMs, setPlaybackPositionMs] = useState(0);
 
-  const recordingRef = useRef<Audio.Recording | null>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const playerRef = useRef<AudioPlayer | null>(null);
+  const positionIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ─── Recorder (expo-audio built-in hook) ───
+
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(audioRecorder, 100);
+
+  // ─── Derived state ───
+
+  const isRecording = recorderState.isRecording;
+  const durationMs =
+    status === 'recording'
+      ? recorderState.durationMillis
+      : finalDurationMs;
+
+  // Sync recorder status
+  useEffect(() => {
+    if (recorderState.isRecording && status !== 'recording') {
+      setStatus('recording');
+    }
+  }, [recorderState.isRecording, status]);
 
   // ─── Permission ───
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
-    const { granted } = await Audio.requestPermissionsAsync();
-    setHasPermission(granted);
-    return granted;
+    const result = await requestRecordingPermissionsAsync();
+    setHasPermission(result.granted);
+    return result.granted;
+  }, []);
+
+  // ─── Cleanup player ───
+
+  const cleanupPlayer = useCallback(() => {
+    if (positionIntervalRef.current) {
+      clearInterval(positionIntervalRef.current);
+      positionIntervalRef.current = null;
+    }
+    if (playerRef.current) {
+      playerRef.current.remove();
+      playerRef.current = null;
+    }
+    setIsPlaying(false);
+    setPlaybackPositionMs(0);
   }, []);
 
   // ─── Start Recording ───
 
   const startRecording = useCallback(async () => {
-    // Ensure permission
     let permitted = hasPermission;
     if (!permitted) {
       permitted = await requestPermission();
       if (!permitted) return;
     }
 
-    // Stop any existing playback first
-    if (soundRef.current) {
-      await soundRef.current.unloadAsync();
-      soundRef.current = null;
-      setIsPlaying(false);
-      setPlaybackPositionMs(0);
-    }
+    // Stop any playback
+    cleanupPlayer();
 
-    // Configure audio mode for recording
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: true,
-      playsInSilentModeIOS: true,
+    // Set audio mode for recording
+    await setAudioModeAsync({
+      allowsRecording: true,
+      playsInSilentMode: true,
     });
 
-    // Create recording with HIGH_QUALITY preset + status callback
-    const { recording } = await Audio.Recording.createAsync(
-      Audio.RecordingOptionsPresets.HIGH_QUALITY,
-      (recordingStatus) => {
-        if (recordingStatus.isRecording) {
-          setDurationMs(recordingStatus.durationMillis);
-        }
-      },
-      100, // Update every 100ms
-    );
-
-    recordingRef.current = recording;
-    setStatus('recording');
     setRecordingUri(null);
-    setDurationMs(0);
-  }, [hasPermission, requestPermission]);
+    setFinalDurationMs(0);
+    setStatus('recording');
+
+    await audioRecorder.prepareToRecordAsync();
+    audioRecorder.record();
+  }, [hasPermission, requestPermission, audioRecorder, cleanupPlayer]);
 
   // ─── Stop Recording ───
 
   const stopRecording = useCallback(async (): Promise<IRecordingResult | null> => {
-    const recording = recordingRef.current;
-    if (!recording) return null;
-
     try {
-      await recording.stopAndUnloadAsync();
+      await audioRecorder.stop();
 
-      // Reset audio mode for playback
-      // IMPORTANT: Must disable recording mode AND configure playback output
-      // On Android, without this the audio may route to earpiece instead of speaker
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
       });
 
-      const uri = recording.getURI();
-      const finalDuration = durationMs;
+      const uri = audioRecorder.uri;
+      const duration = recorderState.durationMillis;
 
-      recordingRef.current = null;
       setStatus('stopped');
+      setFinalDurationMs(duration);
 
       if (uri) {
         setRecordingUri(uri);
-        return { uri, durationMs: finalDuration };
+        return { uri, durationMs: duration };
       }
 
       return null;
     } catch (error) {
       console.error('Error stopping recording:', error);
-      recordingRef.current = null;
       setStatus('stopped');
       return null;
     }
-  }, [durationMs]);
-
-  // ─── Playback Status Callback ───
-
-  const onPlaybackStatusUpdate = useCallback((playbackStatus: AVPlaybackStatus) => {
-    if (!playbackStatus.isLoaded) return;
-
-    setPlaybackPositionMs(playbackStatus.positionMillis);
-
-    if (playbackStatus.didJustFinish) {
-      setIsPlaying(false);
-      setPlaybackPositionMs(0);
-    }
-  }, []);
+  }, [audioRecorder, recorderState.durationMillis]);
 
   // ─── Play Recording ───
 
@@ -135,53 +138,61 @@ export const useAudioRecorder = (): IUseAudioRecorderReturn => {
     if (!recordingUri) return;
 
     try {
-      // Ensure audio mode is set for playback (not recording)
-      // This is critical on Android — without it, audio may be silent
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
       });
 
-      // If sound already loaded, just play/replay
-      if (soundRef.current) {
-        const soundStatus = await soundRef.current.getStatusAsync();
-        if (soundStatus.isLoaded) {
-          // If finished, replay from start
-          if (soundStatus.didJustFinish || !soundStatus.isPlaying) {
-            await soundRef.current.setPositionAsync(0);
-          }
-          await soundRef.current.playAsync();
-          setIsPlaying(true);
-          return;
-        }
+      // Create player if not exists
+      if (!playerRef.current) {
+        playerRef.current = createAudioPlayer({ uri: recordingUri });
       }
 
-      // Load new sound
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: recordingUri },
-        { shouldPlay: true, progressUpdateIntervalMillis: 100 },
-        onPlaybackStatusUpdate,
-      );
+      const currentPlayer = playerRef.current;
+      if (!currentPlayer) return;
 
-      soundRef.current = sound;
+      currentPlayer.play();
       setIsPlaying(true);
+
+      // Poll position every 100ms
+      if (positionIntervalRef.current) {
+        clearInterval(positionIntervalRef.current);
+      }
+      positionIntervalRef.current = setInterval(() => {
+        if (!playerRef.current) return;
+
+        const currentTimeSec = playerRef.current.currentTime;
+        const durationSec = playerRef.current.duration;
+
+        setPlaybackPositionMs(Math.round(currentTimeSec * 1000));
+
+        // Check if playback finished
+        if (durationSec > 0 && currentTimeSec >= durationSec) {
+          setIsPlaying(false);
+          setPlaybackPositionMs(0);
+          playerRef.current.seekTo(0);
+          playerRef.current.pause();
+          if (positionIntervalRef.current) {
+            clearInterval(positionIntervalRef.current);
+            positionIntervalRef.current = null;
+          }
+        }
+      }, 100);
     } catch (error) {
       console.error('Error playing recording:', error);
       setIsPlaying(false);
     }
-  }, [recordingUri, onPlaybackStatusUpdate]);
+  }, [recordingUri]);
 
   // ─── Stop Playback ───
 
   const stopPlayback = useCallback(async () => {
-    if (soundRef.current) {
-      try {
-        await soundRef.current.pauseAsync();
-      } catch {
-        // Ignore errors when stopping
-      }
+    if (playerRef.current) {
+      playerRef.current.pause();
+    }
+    if (positionIntervalRef.current) {
+      clearInterval(positionIntervalRef.current);
+      positionIntervalRef.current = null;
     }
     setIsPlaying(false);
   }, []);
@@ -190,20 +201,14 @@ export const useAudioRecorder = (): IUseAudioRecorderReturn => {
 
   useEffect(() => {
     return () => {
-      if (recordingRef.current) {
-        recordingRef.current.stopAndUnloadAsync().catch(() => {
-          // Ignore cleanup errors
-        });
+      if (positionIntervalRef.current) {
+        clearInterval(positionIntervalRef.current);
       }
-      if (soundRef.current) {
-        soundRef.current.unloadAsync().catch(() => {
-          // Ignore cleanup errors
-        });
+      if (playerRef.current) {
+        playerRef.current.remove();
       }
     };
   }, []);
-
-  const isRecording = status === 'recording';
 
   return {
     status,
@@ -214,7 +219,6 @@ export const useAudioRecorder = (): IUseAudioRecorderReturn => {
     stopRecording,
     hasPermission,
     requestPermission,
-    // Playback
     isPlaying,
     playbackPositionMs,
     playRecording,

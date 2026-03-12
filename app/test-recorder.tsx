@@ -3,7 +3,7 @@ import React, { useCallback, useMemo } from 'react';
 import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useAudioRecorder } from '@/src/features/telemedicine/hooks/useAudioRecorder';
+import { useAudioRecorderHook as useAudioRecorder } from '@/src/features/telemedicine/hooks/useAudioRecorder';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 

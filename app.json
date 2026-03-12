@@ -19,7 +19,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Ứng dụng cần truy cập Camera để thực hiện cuộc gọi video với bác sĩ.",
         "NSMicrophoneUsageDescription": "Ứng dụng cần truy cập Micro để ghi âm ghi chú bệnh án và gọi video."
-      }
+      },
+      "appleTeamId": "UDUP78XLVD"
     },
     "android": {
       "adaptiveIcon": {
@@ -34,7 +35,10 @@
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
-        "MODIFY_AUDIO_SETTINGS"
+        "MODIFY_AUDIO_SETTINGS",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "web": {
@@ -60,7 +64,7 @@
         }
       ],
       [
-        "expo-av",
+        "expo-audio",
         {
           "microphonePermission": "Ứng dụng cần truy cập Micro để ghi âm ghi chú bệnh án."
         }

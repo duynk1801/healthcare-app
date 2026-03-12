@@ -6,7 +6,7 @@ export { CallHeader } from './components/CallHeader';
 
 // ─── Hooks ───
 export { useCallControls } from './hooks/useCallControls';
-export { useAudioRecorder } from './hooks/useAudioRecorder';
+export { useAudioRecorderHook } from './hooks/useAudioRecorder';
 
 // ─── Types ───
 export type {
